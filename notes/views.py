@@ -2,8 +2,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views import generic
 
-from .forms import NoteForm
-from .models import Note
+from notes.forms import NoteForm
+from notes.models import Note
 
 
 class Home(generic.TemplateView):
