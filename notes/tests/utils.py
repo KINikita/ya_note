@@ -10,15 +10,27 @@ User = get_user_model()
 class TestParentCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.author = User.objects.create_user(username='author')
-        cls.not_author = User.objects.create_user(username='not_author')
-        cls.admin = User.objects.create_user(username='admin')
+        cls.author = User.objects.create_user(
+            username='author',
+            password='password'
+        )
+        cls.not_author = User.objects.create_user(
+            username='not_author',
+            password='password'
+        )
+        cls.admin = User.objects.create_user(
+            username='admin',
+            password='password',
+            is_staff=True
+        )
 
         cls.form_data = {
             'title': 'Новый заголовок',
             'text': 'Новый текст',
             'slug': 'new-slug'
         }
+        cls.anonymous_client = Client()
+
         cls.author_client = Client()
         cls.author_client.force_login(cls.author)
 
@@ -34,8 +46,17 @@ class TestParentCase(TestCase):
             slug='test-note',
             author=cls.author
         )
-
+        cls.home_url = reverse('notes:home')
+        cls.add_url = reverse('notes:add')
+        cls.success_url = reverse('notes:success')
+        cls.edit_url = reverse('notes:edit', args=(cls.note.slug,))
+        cls.detail_url = reverse('notes:detail', args=(cls.note.slug,))
+        cls.delete_url = reverse('notes:delete', args=(cls.note.slug,))
         cls.list_url = reverse('notes:list')
+        cls.login_url = reverse('users:login')
+        cls.logout_url = reverse('users:logout')
+        cls.signup = reverse('users:signup')
+        cls.delete_notes = Note.objects.all().delete
 
     @classmethod
     def tearDownClass(cls):

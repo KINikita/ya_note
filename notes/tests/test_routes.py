@@ -1,7 +1,8 @@
 from http import HTTPStatus
 
+from django.test import Client
+
 from notes.tests.utils import TestParentCase
-from django.urls import reverse
 
 
 class TestRoutes(TestParentCase):
@@ -27,98 +28,104 @@ class TestRoutes(TestParentCase):
         4. Для страниц, не требующих slug (add, list, success), проверяется
         формирование корректного URL без дополнительных аргументов.
         """
-        login_url = reverse('users:login')
-        redirect_from_names = (
-            ('notes:edit', self.note.slug),
-            ('notes:delete', self.note.slug),
-            ('notes:detail', self.note.slug),
-            ('notes:add', None),
-            ('notes:list', None),
-            ('notes:success', None),
+        url_names = (
+            self.add_url,
+            self.edit_url,
+            self.delete_url,
+            self.detail_url,
+            self.list_url,
+            self.success_url,
+            self.success_url,
         )
-        for name, slug in redirect_from_names:
-            if slug:
-                with self.subTest(name=name):
-                    url = reverse(name, args=(slug,))
-            else:
-                with self.subTest(name=name):
-                    url = reverse(name)
-            redirect_url = f'{login_url}?next={url}'
+        for url in url_names:
+            redirect_url = f'{self.login_url}?next={url}'
             response = self.client.get(url)
             self.assertRedirects(response, redirect_url)
 
     def test_pages_availability_for_all_users(self):
-        """
-        Проверяет доступность страниц для разных типов пользователей:
-        - анонимных пользователей
-        - авторизованных пользователей
-        - администраторов
+        """Проверяет доступность страниц для разных типов пользователей."""
+        test_cases = [
+            # Анонимные пользователи
+            (self.home_url, None, HTTPStatus.OK, "Главная страница - аноним"),
+            (self.login_url, None, HTTPStatus.OK, "Страница входа - аноним"),
+            (self.logout_url, None, HTTPStatus.OK, "Страница выхода - аноним"),
+            (self.signup, None, HTTPStatus.OK, "Регистрация - аноним"),
 
-        Тестируемые страницы:
-        - Главная страница ('notes:home')
-        - Страница входа ('users:login')
-        - Страница выхода ('users:logout')
-        - Страница регистрации ('users:signup')
-        - Список заметок ('notes:list')
-        - Добавление заметки ('notes:add')
-        - Успешное добавление заметки ('notes:success')
-        - Конкретная заметка ('notes:detail')
-        - Обновление заметки ('notes:edit')
-        - Удаление заметки ('notes:delete')
-
-        Ожидаемое поведение:
-        Должны быть доступны для всех типов пользователей:
-        - Главная страница ('notes:home')
-        - Страница входа ('users:login')
-        - Страница выхода ('users:logout')
-        - Страница регистрации ('users:signup')
-        Должны быть доступны только для аутентифицированных пользователей:
-        - Список заметок ('notes:list')
-        - Добавление заметки ('notes:add')
-        - Успешное добавление заметки ('notes:success')
-        Должны быть доступны только для авторов
-        (для аутентифицированных пользователей вернется ошибка 404):
-        - Конкретная заметка ('notes:detail')
-        - Обновление заметки ('notes:edit')
-        - Удаление заметки ('notes:delete')
-        """
-        test_cases = (
+            # Авторизованные пользователи (общие страницы)
             (
-                ('notes:home', 'users:login', 'users:logout', 'users:signup'),
+                self.list_url,
+                self.author,
                 HTTPStatus.OK,
-                False,
-                (None, self.author, self.admin)
+                "Список заметок - автор"
             ),
             (
-                ('notes:list', 'notes:add', 'notes:success'),
+                self.add_url,
+                self.author,
                 HTTPStatus.OK,
-                False,
-                (self.author, self.admin)
+                "Добавление заметки - автор"
             ),
             (
-                ('notes:detail', 'notes:edit', 'notes:delete'),
+                self.success_url,
+                self.author,
                 HTTPStatus.OK,
-                True,
-                (self.author,)
+                "Успешное добавление - автор"
             ),
             (
-                ('notes:detail', 'notes:edit', 'notes:delete'),
+                self.list_url,
+                self.admin,
+                HTTPStatus.OK,
+                "Список заметок - админ"
+            ),
+            (
+                self.detail_url,
+                self.author,
+                HTTPStatus.OK,
+                "Просмотр заметки - автор"
+            ),
+            (
+                self.edit_url,
+                self.author,
+                HTTPStatus.OK,
+                "Редактирование - автор"
+            ),
+            (
+                self.delete_url,
+                self.author,
+                HTTPStatus.OK,
+                "Удаление - автор"
+            ),
+            (
+                self.detail_url,
+                self.not_author,
                 HTTPStatus.NOT_FOUND,
-                True,
-                (self.not_author,)
-            )
-        )
+                "Просмотр - не-автор"
+            ),
+            (
+                self.edit_url,
+                self.not_author,
+                HTTPStatus.NOT_FOUND,
+                "Редактирование - не-автор"
+            ),
+            (
+                self.delete_url,
+                self.not_author,
+                HTTPStatus.NOT_FOUND,
+                "Удаление - не-автор"
+            ),
+        ]
 
-        for urls, expected_status, needs_slug, users in test_cases:
-            for user in users:
-                if user:
-                    self.client.force_login(user)
-
-                for url_name in urls:
-                    with self.subTest(url=url_name, user=user):
-                        if needs_slug:
-                            url = reverse(url_name, args=(self.note.slug,))
-                        else:
-                            url = reverse(url_name)
-                        response = self.client.get(url)
-                        self.assertEqual(response.status_code, expected_status)
+        for url, user, expected_status, test_name in test_cases:
+            with self.subTest(test_name):
+                client = Client()
+                if user is not None:
+                    client.force_login(user)
+                response = client.get(url)
+                self.assertEqual(
+                    response.status_code,
+                    expected_status,
+                    f"Ошибка в тесте '{test_name}'\n"
+                    f"URL: {url}\n"
+                    f"Пользователь: {user.username if user else 'аноним'}\n"
+                    f"Ожидался статус: {expected_status}\n"
+                    f"Получен статус: {response.status_code}"
+                )

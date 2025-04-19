@@ -1,7 +1,6 @@
-from django.urls import reverse
+from notes.forms import NoteForm
 
 from notes.tests.utils import TestParentCase
-from notes.forms import NoteForm
 
 
 class TestNotesListForDifferentUsers(TestParentCase):
@@ -11,27 +10,26 @@ class TestNotesListForDifferentUsers(TestParentCase):
         test_cases = [
             (
                 self.author_client,
-                True,
+                lambda: self.assertIn(
+                    self.note,
+                    response.context['object_list']
+                ),
                 'Автор должен видеть свою заметку'
             ),
             (
                 self.not_author_client,
-                False,
+                lambda: self.assertNotIn(
+                    self.note,
+                    response.context['object_list']
+                ),
                 'Не-автор не должен видеть чужую заметку'
             )
         ]
 
-        for client, should_be_seen, msg in test_cases:
-            with self.subTest(
-                client=client,
-                should_be_seen=should_be_seen
-            ):
+        for client, assertion, msg in test_cases:
+            with self.subTest(client=client, msg=msg):
                 response = client.get(self.list_url)
-                object_list = response.context['object_list']
-                if should_be_seen:
-                    self.assertIn(self.note, object_list, msg)
-                else:
-                    self.assertNotIn(self.note, object_list, msg)
+                assertion()
 
     def test_pages_contain_form(self):
         """
@@ -40,19 +38,16 @@ class TestNotesListForDifferentUsers(TestParentCase):
         """
         test_cases = (
             (
-                'notes:add',
-                None,
+                self.add_url,
                 'Проверьте наличие формы на странице создания заметки'
             ),
             (
-                'notes:edit',
-                (self.note.slug,),
+                self.edit_url,
                 'Проверьте наличие формы на странице редактирования заметки'
             )
         )
-        for name, args, msg in test_cases:
-            with self.subTest(name=name, args=args):
-                url = reverse(name, args=args)
-                response = self.author_client.get(url)
+        for url_name, msg in test_cases:
+            with self.subTest(url_name=url_name):
+                response = self.author_client.get(url_name)
                 self.assertIn('form', response.context, msg)
                 self.assertIsInstance(response.context['form'], NoteForm, msg)
