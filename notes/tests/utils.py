@@ -29,7 +29,6 @@ class TestParentCase(TestCase):
             'text': 'Новый текст',
             'slug': 'new-slug'
         }
-        cls.anonymous_client = Client()
 
         cls.author_client = Client()
         cls.author_client.force_login(cls.author)
@@ -56,7 +55,6 @@ class TestParentCase(TestCase):
         cls.login_url = reverse('users:login')
         cls.logout_url = reverse('users:logout')
         cls.signup = reverse('users:signup')
-        cls.delete_notes = Note.objects.all().delete
 
     @classmethod
     def tearDownClass(cls):

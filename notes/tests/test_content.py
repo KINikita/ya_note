@@ -10,18 +10,12 @@ class TestNotesListForDifferentUsers(TestParentCase):
         test_cases = [
             (
                 self.author_client,
-                lambda: self.assertIn(
-                    self.note,
-                    response.context['object_list']
-                ),
+                self.assertIn,
                 'Автор должен видеть свою заметку'
             ),
             (
                 self.not_author_client,
-                lambda: self.assertNotIn(
-                    self.note,
-                    response.context['object_list']
-                ),
+                self.assertNotIn,
                 'Не-автор не должен видеть чужую заметку'
             )
         ]
@@ -29,7 +23,7 @@ class TestNotesListForDifferentUsers(TestParentCase):
         for client, assertion, msg in test_cases:
             with self.subTest(client=client, msg=msg):
                 response = client.get(self.list_url)
-                assertion()
+                assertion(self.note, response.context['object_list'])
 
     def test_pages_contain_form(self):
         """
